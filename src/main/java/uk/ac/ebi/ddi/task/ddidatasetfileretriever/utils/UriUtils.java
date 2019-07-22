@@ -6,6 +6,9 @@ import java.net.URISyntaxException;
 
 public class UriUtils {
 
+    private UriUtils() {
+    }
+
     public static URI toUri(String url) throws IOException {
         try {
             return new URI(url);
