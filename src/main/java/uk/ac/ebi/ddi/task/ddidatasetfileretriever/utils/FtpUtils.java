@@ -14,6 +14,8 @@ public class FtpUtils {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FtpUtils.class);
 
+    private FtpUtils() {
+    }
 
     /**
      * Get list of files from given path that in their name or inside their path must not contain the given string

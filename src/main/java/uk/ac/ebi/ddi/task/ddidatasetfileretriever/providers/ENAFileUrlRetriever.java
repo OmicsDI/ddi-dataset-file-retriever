@@ -132,7 +132,7 @@ public class ENAFileUrlRetriever extends DatasetFileUrlRetriever {
             ResponseEntity<String> assemblyFiles = execute(x -> restTemplate.getForEntity(viewUri, String.class));
             if (assemblyFiles.getBody() != null) {
                 Matcher matcher = assemblyPattern.matcher(assemblyFiles.getBody());
-                while(matcher.find()) {
+                while (matcher.find()) {
                     result.add(matcher.group(1));
                 }
             }
