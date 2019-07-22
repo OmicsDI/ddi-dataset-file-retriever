@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>uk.ac.ebi.ddi.task</groupId>
 	<artifactId>ddi-dataset-file-retriever</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>1.0-SNAPSHOT</version>
 	<name>ddi-dataset-file-retriever</name>
 	<description>Demo project for Spring Boot</description>
 
