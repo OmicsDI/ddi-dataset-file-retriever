@@ -6,16 +6,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import uk.ac.ebi.ddi.service.db.model.database.DatabaseDetail;
 import uk.ac.ebi.ddi.service.db.model.dataset.Dataset;
 import uk.ac.ebi.ddi.service.db.model.dataset.DatasetFile;
-import uk.ac.ebi.ddi.service.db.service.database.DatabaseDetailService;
 import uk.ac.ebi.ddi.service.db.service.dataset.DatasetFileService;
 import uk.ac.ebi.ddi.service.db.service.dataset.IDatasetService;
+import uk.ac.ebi.ddi.service.db.utils.DatasetCategory;
 import uk.ac.ebi.ddi.service.db.utils.DatasetUtils;
 import uk.ac.ebi.ddi.task.ddidatasetfileretriever.configuration.DatasetFileRetrieveTaskProperties;
-import uk.ac.ebi.ddi.task.ddidatasetfileretriever.exceptions.DatabaseNotFoundException;
 import uk.ac.ebi.ddi.task.ddidatasetfileretriever.providers.*;
+import uk.ac.ebi.ddi.task.ddidatasetfileretriever.services.SecondaryAccessionService;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -28,19 +27,17 @@ public class DdiDatasetFileRetrieverApplication implements CommandLineRunner {
 
     private IDatasetFileUrlRetriever retriever = new DefaultDatasetFileUrlRetriever();
 
-    private List<DatabaseDetail> databaseDetails;
-
     @Autowired
     private IDatasetService datasetService;
-
-    @Autowired
-    private DatabaseDetailService databaseDetailService;
 
     @Autowired
     private DatasetFileRetrieveTaskProperties taskProperties;
 
     @Autowired
     private DatasetFileService datasetFileService;
+
+    @Autowired
+    private SecondaryAccessionService secondaryAccessionService;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DdiDatasetFileRetrieverApplication.class);
 
@@ -70,48 +67,33 @@ public class DdiDatasetFileRetrieverApplication implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        databaseDetails = databaseDetailService.getDatabaseList();
         List<Dataset> datasets = datasetService.readDatasetHashCode(taskProperties.getDatabaseName());
-        datasets.stream()
-                .filter(x -> !DatasetUtils.isPrivateDataset(x))
-                .forEach(x -> process(x, datasets.size()));
+        datasets.forEach(x -> process(x, datasets.size()));
     }
 
-    private DatabaseDetail getDatabase(String accession) {
-        for (DatabaseDetail databaseDetail : databaseDetails) {
-            if (databaseDetail.getAccessionPrefix() == null) {
-                continue;
-            }
-            for (String prefix : databaseDetail.getAccessionPrefix()) {
-                if (accession.startsWith(prefix)) {
-                    return databaseDetail;
-                }
-            }
-        }
-        LOGGER.error("Database for dataset {} is not found", accession);
-        throw new DatabaseNotFoundException();
+    private boolean isDatasetNeedToFetchFiles(Dataset ds) {
+        boolean status = ds.getCurrentStatus().equals(DatasetCategory.INSERTED.getType())
+                || ds.getCurrentStatus().equals(DatasetCategory.UPDATED.getType())
+                || ds.getCurrentStatus().equals(DatasetCategory.ANNOTATED.getType())
+                || ds.getCurrentStatus().equals(DatasetCategory.ENRICHED.getType())
+                || taskProperties.isForce();
+
+        return status
+                && !Objects.equals(DatasetUtils.getConfiguration(ds, IGNORE_DATASET_FILE_RETRIEVER), "true")
+                && !DatasetUtils.isPrivateDataset(ds);
     }
 
     private void process(Dataset ds, int total) {
         Dataset dataset = datasetService.read(ds.getAccession(), ds.getDatabase());
-        Set<String> urls = new HashSet<>();
         try {
-            if (!Objects.equals(DatasetUtils.getConfiguration(dataset, IGNORE_DATASET_FILE_RETRIEVER), "true")) {
-                urls.addAll(retriever.getDatasetFiles(dataset.getAccession(), dataset.getDatabase()));
+            if (!isDatasetNeedToFetchFiles(dataset)) {
+                return;
             }
-            for (String secondaryAccession : dataset.getAllSecondaryAccessions()) {
-                if (secondaryAccession.contains("~")) {
-                    secondaryAccession = secondaryAccession.split("~")[0];
-                }
-
-                try {
-                    String database = getDatabase(secondaryAccession).getDatabaseName();
-                    if (database.equals(dataset.getDatabase())) {
-                        // Subseries, ignoring
-                        continue;
-                    }
-                    urls.addAll(retriever.getDatasetFiles(secondaryAccession, database));
-                } catch (DatabaseNotFoundException ignore) {
+            Set<String> urls = new HashSet<>(retriever.getDatasetFiles(dataset.getAccession(), dataset.getDatabase()));
+            Map<String, List<String>> secondaryAccessions = secondaryAccessionService.getSecondaryAccessions(dataset);
+            for (Map.Entry<String, List<String>> entry : secondaryAccessions.entrySet()) {
+                for (String secondaryAccession : entry.getValue()) {
+                    urls.addAll(retriever.getDatasetFiles(secondaryAccession, entry.getKey()));
                 }
             }
             if (!urls.isEmpty()) {
@@ -120,11 +102,10 @@ public class DdiDatasetFileRetrieverApplication implements CommandLineRunner {
                         .map(x -> new DatasetFile(ds.getAccession(), ds.getDatabase(), x, FROM_FILE_RETRIEVER))
                         .collect(Collectors.toList()));
             }
-        } catch (DatabaseNotFoundException e) {
-            LOGGER.info("Database for secondary accession of dataset {} not found", dataset.getAccession());
+            dataset.setCurrentStatus(DatasetCategory.FILES_FETCHED.getType());
+            datasetService.save(dataset);
         } catch (Exception e) {
-            String identity = dataset.getAccession() + " - " + dataset.getDatabase();
-            LOGGER.error("Exception occurred with dataset {}, ", identity, e);
+            LOGGER.error("Exception occurred with dataset {}, ", ds, e);
         } finally {
             calculatePercentFinished(dataset.getAccession(), total);
         }

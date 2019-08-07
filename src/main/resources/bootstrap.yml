@@ -1,4 +1,6 @@
 spring:
+  application:
+    name: cloud-task
   cloud:
     config:
       uri: http://omicsdi-ddi-cloud-config:8888

@@ -12,6 +12,7 @@ import org.springframework.test.context.junit4.SpringRunner;
 import uk.ac.ebi.ddi.service.db.model.dataset.Dataset;
 import uk.ac.ebi.ddi.service.db.service.dataset.DatasetFileService;
 import uk.ac.ebi.ddi.service.db.service.dataset.IDatasetService;
+import uk.ac.ebi.ddi.service.db.utils.DatasetCategory;
 import uk.ac.ebi.ddi.task.ddidatasetfileretriever.configuration.DatasetFileRetrieveTaskProperties;
 
 import java.util.List;
@@ -40,6 +41,7 @@ public class ITDatasetFileRetrieverTest {
 	public void setUp() throws Exception {
 		Dataset dataset = new Dataset();
 		dataset.setAccession("E-ATMX-10");
+		dataset.setCurrentStatus(DatasetCategory.ENRICHED.getType());
 		dataset.setDatabase(taskProperties.getDatabaseName());
 		datasetService.save(dataset);
 	}
