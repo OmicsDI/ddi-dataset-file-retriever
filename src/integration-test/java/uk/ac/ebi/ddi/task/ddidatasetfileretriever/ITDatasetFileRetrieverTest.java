@@ -21,7 +21,7 @@ import java.util.List;
 @ContextConfiguration(classes = DdiDatasetFileRetrieverApplication.class,
 		initializers = ConfigFileApplicationContextInitializer.class)
 @TestPropertySource(properties = {
-		"file-retriever.database_name=ArrayExpress"
+		"file-retriever.database_name=PeptideAtlas"
 })
 public class ITDatasetFileRetrieverTest {
 
@@ -40,7 +40,7 @@ public class ITDatasetFileRetrieverTest {
 	@Before
 	public void setUp() throws Exception {
 		Dataset dataset = new Dataset();
-		dataset.setAccession("E-ATMX-10");
+		dataset.setAccession("PAe000289");
 		dataset.setCurrentStatus(DatasetCategory.ENRICHED.getType());
 		dataset.setDatabase(taskProperties.getDatabaseName());
 		datasetService.save(dataset);
@@ -49,7 +49,7 @@ public class ITDatasetFileRetrieverTest {
 	@Test
 	public void contextLoads() throws Exception {
 		application.run();
-		List<String> fileUrls = datasetFileService.getFiles("E-ATMX-10", taskProperties.getDatabaseName());
+		List<String> fileUrls = datasetFileService.getFiles("PAe000289", taskProperties.getDatabaseName());
 		Assert.assertTrue(fileUrls.size() > 0);
 	}
 

@@ -8,6 +8,9 @@ import java.io.IOException;
 public class DdiFPTClient extends FTPClient implements Closeable {
     @Override
     public void close() throws IOException {
-        this.disconnect();
+        if (isConnected()) {
+            logout();
+            disconnect();
+        }
     }
 }
