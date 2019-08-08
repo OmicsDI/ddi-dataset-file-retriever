@@ -113,7 +113,7 @@ public class DdiDatasetFileRetrieverApplication implements CommandLineRunner {
 
     private synchronized void calculatePercentFinished(String accession, int total) {
         processed.add(accession);
-        if (processed.size() % 500 == 0) {
+        if (processed.size() % 100 == 0) {
             LOGGER.info("Processed {}/{}", processed.size(), total);
         }
     }
