@@ -29,7 +29,9 @@ public abstract class DatasetFileUrlRetriever extends RetryClient implements IDa
 
     protected RestTemplate restTemplate;
 
-    private static final int FTP_TIMEOUT = 60000;
+    private static final int FTP_TIMEOUT = 5 * 60000;
+
+    private static final int BUFFER_LIMIT = 1024 * 1024;
 
     public DatasetFileUrlRetriever(IDatasetFileUrlRetriever datasetDownloadingRetriever) {
         this.datasetDownloadingRetriever = datasetDownloadingRetriever;
@@ -50,8 +52,11 @@ public abstract class DatasetFileUrlRetriever extends RetryClient implements IDa
     protected DdiFPTClient createFtpClient(String host, String username, String password) throws IOException {
         DdiFPTClient ftpClient = new DdiFPTClient();
         ftpClient.setConnectTimeout(FTP_TIMEOUT);
+        ftpClient.setDefaultTimeout(FTP_TIMEOUT);
         ftpClient.connect(host);
-        ftpClient.login("anonymous", "anonymous");
+        ftpClient.login(username, password);
+        ftpClient.setBufferSize(BUFFER_LIMIT);
+        ftpClient.enterLocalPassiveMode();
         return ftpClient;
     }
 
