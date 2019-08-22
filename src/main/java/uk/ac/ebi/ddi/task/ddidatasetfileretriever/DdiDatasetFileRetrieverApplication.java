@@ -67,26 +67,27 @@ public class DdiDatasetFileRetrieverApplication implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        List<Dataset> datasets = datasetService.readDatasetHashCode(taskProperties.getDatabaseName());
+        List<Dataset> datasets = datasetService.readDatasetHashCode(taskProperties.getDatabaseName())
+                .stream().filter(this::isDatasetNeedToFetchFiles)
+                .collect(Collectors.toList());
+        Collections.shuffle(datasets);
         datasets.forEach(x -> process(x, datasets.size()));
     }
 
     private boolean isDatasetNeedToFetchFiles(Dataset ds) {
-        boolean status = ds.getCurrentStatus().equals(DatasetCategory.INSERTED.getType())
+        return ds.getCurrentStatus().equals(DatasetCategory.INSERTED.getType())
                 || ds.getCurrentStatus().equals(DatasetCategory.UPDATED.getType())
                 || ds.getCurrentStatus().equals(DatasetCategory.ANNOTATED.getType())
                 || ds.getCurrentStatus().equals(DatasetCategory.ENRICHED.getType())
                 || taskProperties.isForce();
-
-        return status
-                && !Objects.equals(DatasetUtils.getConfiguration(ds, IGNORE_DATASET_FILE_RETRIEVER), "true")
-                && !DatasetUtils.isPrivateDataset(ds);
     }
 
     private void process(Dataset ds, int total) {
         Dataset dataset = datasetService.read(ds.getAccession(), ds.getDatabase());
         try {
-            if (!isDatasetNeedToFetchFiles(dataset)) {
+            if (Objects.equals(DatasetUtils.getConfiguration(dataset, IGNORE_DATASET_FILE_RETRIEVER), "true") ||
+                    DatasetUtils.isPrivateDataset(dataset) || !isDatasetNeedToFetchFiles(ds)) {
+                // We call the isDatasetNeedToFetchFiles one again for parallel computing
                 return;
             }
             Set<String> urls = new HashSet<>(retriever.getDatasetFiles(dataset.getAccession(), dataset.getDatabase()));
