@@ -90,17 +90,20 @@ public class DdiDatasetFileRetrieverApplication implements CommandLineRunner {
                 // We call the isDatasetNeedToFetchFiles one again for parallel computing
                 return;
             }
-            Set<String> urls = new HashSet<>(retriever.getDatasetFiles(dataset.getAccession(), dataset.getDatabase()));
+            Map<String, Set<String>> urls = new HashMap<>();
+            urls.put(ds.getAccession(), retriever.getDatasetFiles(dataset.getAccession(), dataset.getDatabase()));
             Map<String, List<String>> secondaryAccessions = secondaryAccessionService.getSecondaryAccessions(dataset);
             for (Map.Entry<String, List<String>> entry : secondaryAccessions.entrySet()) {
                 for (String secondaryAccession : entry.getValue()) {
-                    urls.addAll(retriever.getDatasetFiles(secondaryAccession, entry.getKey()));
+                    urls.put(secondaryAccession, retriever.getDatasetFiles(secondaryAccession, entry.getKey()));
                 }
             }
             if (!urls.isEmpty()) {
                 datasetFileService.deleteAll(ds.getAccession(), ds.getDatabase(), FROM_FILE_RETRIEVER);
-                datasetFileService.saveAll(urls.stream()
-                        .map(x -> new DatasetFile(ds.getAccession(), ds.getDatabase(), x, FROM_FILE_RETRIEVER))
+                datasetFileService.saveAll(urls.keySet().stream()
+                        .flatMap(accession -> urls.get(accession).stream()
+                                .map(url -> new DatasetFile(ds.getAccession(), ds.getDatabase(), accession, url,
+                                        FROM_FILE_RETRIEVER)))
                         .collect(Collectors.toList()));
             }
             dataset.setCurrentStatus(DatasetCategory.FILES_FETCHED.getType());
